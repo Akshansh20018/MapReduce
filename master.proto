@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+message Point {
+    int32 index = 1;
+    double x = 2;
+    double y = 3;
+}
+
+
+message PartitionRequest {
+    repeated int32 indexes = 1;
+    repeated Point centroids = 2;
+}
+
+message MapAndPartitionResponse {
+    bool status = 1;
+}
+
+service Master {
+    rpc PartitionInput(PartitionRequest) returns (MapAndPartitionResponse);
+}
