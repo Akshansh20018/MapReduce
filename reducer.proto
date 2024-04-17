@@ -1,10 +1,16 @@
 syntax = "proto3";
 
 message Centroid {
-    int32 index = 1;
+    int32 idx = 1;
     double x = 2;
     double y = 3;
 }
+
+message Cent {
+    double x = 1;
+    double y = 2;
+}
+
 
 message ShuffleSortRequest {
     int32 centroidID = 1;
@@ -13,7 +19,8 @@ message ShuffleSortRequest {
 }
 
 message ReducerResponse {
-    Centroid updatedCentroids = 1;
+    int32 centroidID = 1;
+    Cent updatedCentroids = 2;
 }
 
 service Reducer {

@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rreducer.proto\"/\n\x08\x43\x65ntroid\x12\r\n\x05index\x18\x01 \x01(\x05\x12\t\n\x01x\x18\x02 \x01(\x01\x12\t\n\x01y\x18\x03 \x01(\x01\"R\n\x12ShuffleSortRequest\x12\x12\n\ncentroidID\x18\x01 \x01(\x05\x12\x12\n\nnumMappers\x18\x02 \x01(\x05\x12\x14\n\x0cmapAddresses\x18\x03 \x03(\x05\"6\n\x0fReducerResponse\x12#\n\x10updatedCentroids\x18\x01 \x01(\x0b\x32\t.Centroid2B\n\x07Reducer\x12\x37\n\x0eShuffleAndSort\x12\x13.ShuffleSortRequest\x1a\x10.ReducerResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rreducer.proto\"-\n\x08\x43\x65ntroid\x12\x0b\n\x03idx\x18\x01 \x01(\x05\x12\t\n\x01x\x18\x02 \x01(\x01\x12\t\n\x01y\x18\x03 \x01(\x01\"\x1c\n\x04\x43\x65nt\x12\t\n\x01x\x18\x01 \x01(\x01\x12\t\n\x01y\x18\x02 \x01(\x01\"R\n\x12ShuffleSortRequest\x12\x12\n\ncentroidID\x18\x01 \x01(\x05\x12\x12\n\nnumMappers\x18\x02 \x01(\x05\x12\x14\n\x0cmapAddresses\x18\x03 \x03(\x05\"F\n\x0fReducerResponse\x12\x12\n\ncentroidID\x18\x01 \x01(\x05\x12\x1f\n\x10updatedCentroids\x18\x02 \x01(\x0b\x32\x05.Cent2B\n\x07Reducer\x12\x37\n\x0eShuffleAndSort\x12\x13.ShuffleSortRequest\x1a\x10.ReducerResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -22,11 +22,13 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'reducer_pb2', _globals)
 if _descriptor._USE_C_DESCRIPTORS == False:
   DESCRIPTOR._options = None
   _globals['_CENTROID']._serialized_start=17
-  _globals['_CENTROID']._serialized_end=64
-  _globals['_SHUFFLESORTREQUEST']._serialized_start=66
-  _globals['_SHUFFLESORTREQUEST']._serialized_end=148
-  _globals['_REDUCERRESPONSE']._serialized_start=150
-  _globals['_REDUCERRESPONSE']._serialized_end=204
-  _globals['_REDUCER']._serialized_start=206
-  _globals['_REDUCER']._serialized_end=272
+  _globals['_CENTROID']._serialized_end=62
+  _globals['_CENT']._serialized_start=64
+  _globals['_CENT']._serialized_end=92
+  _globals['_SHUFFLESORTREQUEST']._serialized_start=94
+  _globals['_SHUFFLESORTREQUEST']._serialized_end=176
+  _globals['_REDUCERRESPONSE']._serialized_start=178
+  _globals['_REDUCERRESPONSE']._serialized_end=248
+  _globals['_REDUCER']._serialized_start=250
+  _globals['_REDUCER']._serialized_end=316
 # @@protoc_insertion_point(module_scope)

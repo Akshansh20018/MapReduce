@@ -76,12 +76,12 @@ class MasterHandler(master_pb2_grpc.MasterServicer, Mapper):
 
         self.ind_lst = []
         self.centroids_lst = []
-
+        print(centroids)
         for i in range(len(indexes)):
             self.ind_lst.append(indexes[i])
 
         for i in range(len(centroids)):
-            print(centroids[i].x,centroids[i].y)
+            # print(centroids[i].x,centroids[i].y)
             self.centroids_lst.append([centroids[i].x,centroids[i].y])
 
         for i in range(len(self.centroids_lst)):

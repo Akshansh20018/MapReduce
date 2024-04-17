@@ -10,6 +10,7 @@ from master_pb2 import Point
 import random
 import time
 import copy
+import multiprocessing
 
 class Address:
     def __init__(self, id: int, ip: str, port: int):
@@ -29,6 +30,10 @@ class Master(master_pb2_grpc.MasterServicer):
         self.old_centroids = []
         self.new_centroids = []
         self.mapper_ports = []
+        # for i in range(self.num_centroids):
+        #     x = random.uniform(30,40)
+        #     y = random.uniform(30,40)
+        #     self.new_centroids.append(Point(index = i, x = x, y = y))
         with open(self.file_path, 'r') as file:
             count = 0
             for line in file:
@@ -76,20 +81,28 @@ class Master(master_pb2_grpc.MasterServicer):
 
         request = []
         # for i in range(len(self.mapper_addr)):
+        # m = multiprocessing.Pool(self.num_mappers)
+        # r = multiprocessing.Pool(self.num_centroids)
         for i in range(self.num_mappers):
             # print("1")
             thread = threading.Thread(target=self.request_mapper_partition, args=(self.mapper_addr[i], split_data[i]))    
             request.append(thread)
             thread.start()
-        # time.sleep(2)
+        #     m.apply_async(self.request_mapper_partition, args = ((self.mapper_addr[i], split_data[i])))
+        # # time.sleep(2)
+        # m.close()
+        # m.join()
         for i in request:
             i.join()
         # print("BOOOOOOOO")
-
+        request = []
         for i in range(self.num_centroids):
             thread = threading.Thread(target=self.request_reducer, args=(self.reducer_addr[i%self.num_reducers],i))    
             request.append(thread)
             thread.start()
+        #     r.apply_async(self.request_reducer, args=(self.reducer_addr[i%self.num_reducers],i))
+        # r.close()
+        # r.join()
         for i in request:
             i.join()
         # print("BO2")
@@ -100,14 +113,14 @@ class Master(master_pb2_grpc.MasterServicer):
         stub = master_pb2_grpc.MasterStub(channel)
         # print("3")
         try:
-            request = master_pb2.PartitionRequest(indexes = split_data, centroids = self.old_centroids, numReducers = self.num_reducers)
+            request = master_pb2.PartitionRequest(indexes = split_data, centroids = self.new_centroids, numReducers = self.num_reducers)
             response = stub.PartitionInput(request)
             if response.status == True:
                 print("hogya")
             else:
                 print("nhk")
         except Exception as e:
-            print(e)
+            print("error in mapper")
 
     def request_reducer(self, i:Address, centroidID):
         # print("4")
@@ -120,11 +133,16 @@ class Master(master_pb2_grpc.MasterServicer):
             print("hola")
             response = stub.ShuffleAndSort(request)
             print(" amigo")
-            self.new_centroids[response.index] = [response.x, response.y]
-            print(f"Testing Response {response.index} {response.x} {response.y}")
+            print(response)
+            id = response.centroidID
+            x, y = response.updatedCentroids.x, response.updatedCentroids.y
+            # print("Here here", id, x, y)
+            self.new_centroids[id] = Point(index = id,x = x,y = y)
+            # self.new_centroids[response.index] = [response.x, response.y]
+            # print(f"Testing Response {response.index} {response.x} {response.y}")
             print(self.new_centroids)
         except Exception as e:
-            print(e)
+            print("error in reducer", centroidID)
 
 
 def serve(master):

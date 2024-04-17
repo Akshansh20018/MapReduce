@@ -4,7 +4,7 @@ import reducer_pb2_grpc
 import master_pb2
 import master_pb2_grpc
 from concurrent import futures
-from reducer_pb2 import Centroid, ShuffleSortRequest, ReducerResponse
+from reducer_pb2 import Centroid,Cent, ShuffleSortRequest, ReducerResponse
 import numpy as np
 import sys
 from addr import *
@@ -15,12 +15,13 @@ def helper_new_centroid(data_points):
     x_sum = 0
     y_sum = 0
     for i in data_points:
-        x_sum+= i[0]
-        y_sum+= i[1]    
-
+        x_sum+= i[1]
+        y_sum+= i[2]    
+    if len(data_points) == 0:
+        return 
     x_new = x_sum/len(data_points)
     y_new = y_sum/len(data_points)
-    return [x_new, y_new]
+    return [data_points[0][0], x_new, y_new]
     
 
 class Reducer:
@@ -51,7 +52,8 @@ class Reducer:
             points = response.points
 
             for i in range(len(points)):
-                self.data_points.append([points[i].x, points[i].y])
+                # print("Hello",points[i].index)
+                self.data_points.append([points[i].index,points[i].x, points[i].y])
 
 
 
@@ -60,27 +62,38 @@ class ReducerHandler(reducer_pb2_grpc.ReducerServicer, Reducer):
         super().__init__(id, address)
 
     def ShuffleAndSort(self, request, context):
-        self.data_points = []
-        print("Success")
-        num_mappers = request.numMappers
-        centroidID = request.centroidID
-        mapper_addresses = request.mapAddresses
-        # Recieve all data here
-        print(mapper_addresses)
-        self.receive_data(mapper_addresses, num_mappers, centroidID)
-
-        upd_centroid = helper_new_centroid(self.data_points)
-        print(centroidID, "\n")
-        # response = {'index': centroidID, 'x': upd_centroid[0], 'y': upd_centroid[1]}
-        if centroidID == 0:
-            updated_centroid = Centroid(index=request.centroidID, x=upd_centroid[0], y=upd_centroid[1])
-        else:
-            updated_centroid = Centroid(index=request.centroidID, x=upd_centroid[0], y=upd_centroid[1])
-        # print(f"updated centroid: {upd_centroid[0]} {upd_centroid[1]}")
-        # response = {'index': centroidID, 'x': 0, 'y': 1}
-        print("reached till here with \n", updated_centroid)
-        return reducer_pb2.ReducerResponse(updatedCentroids = updated_centroid)
+        try:
+            self.data_points = []
+            # print("Success")
+            num_mappers = request.numMappers
+            centroidID = request.centroidID
+            mapper_addresses = request.mapAddresses
+            # Recieve all data here
+            print(mapper_addresses)
+            self.receive_data(mapper_addresses, num_mappers, centroidID)
+            
+            upd_centroid = helper_new_centroid(self.data_points)
+            print(centroidID)
+            # response = {'index': centroidID, 'x': upd_centroid[0], 'y': upd_centroid[1]}
+            # if centroidID == 0:
+            #     updated_centroid = Centroid(index=request.centroidID, x=upd_centroid[0], y=upd_centroid[1])
+            # else:
+            updated_centroid = Cent(x=upd_centroid[1], y=upd_centroid[2])
+            print(f"updated centroid: {upd_centroid[0]} - {updated_centroid}")
+            return reducer_pb2.ReducerResponse(centroidID = upd_centroid[0],updatedCentroids = updated_centroid)
         # pass
+        except Exception as e:
+        # Log the exception
+            print(f"An error occurred: {e}")
+            
+            # Set gRPC status details
+            context.set_details(str(e))
+            
+            # Set gRPC status code
+            context.set_code(grpc.StatusCode.INTERNAL)
+            
+            # Raise the exception to terminate the RPC
+            raise
 
 
 def run(handler: ReducerHandler):
