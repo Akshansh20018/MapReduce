@@ -4,8 +4,12 @@ import argparse
 import threading
 import master_pb2
 import master_pb2_grpc
+import reducer_pb2
+import reducer_pb2_grpc
 from master_pb2 import Point
 import random
+import time
+import copy
 
 class Address:
     def __init__(self, id: int, ip: str, port: int):
@@ -24,14 +28,30 @@ class Master(master_pb2_grpc.MasterServicer):
         self.reducer_addr = reducer_addresses
         self.old_centroids = []
         self.new_centroids = []
-        for i in range(self.num_centroids):
-            idx = i
-            x = random.uniform(-50, 50)
-            y = random.uniform(-50,-50)
-            point = Point(index=idx, x=x, y=y)
-            self.new_centroids.append(point)
+        self.mapper_ports = []
+        with open(self.file_path, 'r') as file:
+            count = 0
+            for line in file:
+                if count == self.num_centroids:
+                    break
+                idx = count
+                x, y = line.strip().split(', ')
+                point = Point(index=idx, x=float(x), y=float(y))
+                self.new_centroids.append(point)
+                count+= 1
         print(self.mapper_addr[0].port)
-        self.split_data()
+        for i in range(self.num_mappers):
+            self.mapper_ports.append(int(self.mapper_addr[i].port))
+
+        for i in range(self.num_iterations):
+            print(i)
+            self.split_data()
+            print("uasuobao: ", self.old_centroids, self.new_centroids)
+            if self.old_centroids == self.new_centroids:
+                print(f"Converged at iteration {i}")
+                break
+            self.old_centroids = copy.deepcopy(self.new_centroids)
+        
 
     def ProcessTask(self, request, context):
         # Simulate task processing
@@ -41,13 +61,9 @@ class Master(master_pb2_grpc.MasterServicer):
         points = []
         with open(self.file_path, 'r') as file:
             for line in file:
-                temp = []
                 # print(line)
                 x, y = line.strip().split(', ')
-                # print(x)
-                temp.append(float(x))
-                temp.append(float(y))
-                points.append(temp)
+                points.append([float(x), float(y)])
         
         data_len = len(points)
 
@@ -56,26 +72,35 @@ class Master(master_pb2_grpc.MasterServicer):
         for i in range(data_len):
             ind = i%self.num_mappers
             split_data[ind].append(i)
-        print(split_data)
+        # print(split_data)
 
         request = []
         # for i in range(len(self.mapper_addr)):
         for i in range(self.num_mappers):
-            print("1")
-            thread = threading.Thread(target=self.request_partition, args=(self.mapper_addr[i],split_data[i]))    
+            # print("1")
+            thread = threading.Thread(target=self.request_mapper_partition, args=(self.mapper_addr[i], split_data[i]))    
             request.append(thread)
             thread.start()
-        
+        # time.sleep(2)
         for i in request:
             i.join()
+        # print("BOOOOOOOO")
+
+        for i in range(self.num_centroids):
+            thread = threading.Thread(target=self.request_reducer, args=(self.reducer_addr[i%self.num_reducers],i))    
+            request.append(thread)
+            thread.start()
+        for i in request:
+            i.join()
+        # print("BO2")
     
-    def request_partition(self, i:Address, split_data):
-        print("2")
+    def request_mapper_partition(self, i:Address, split_data):
+        # print("2")
         channel = grpc.insecure_channel(f"{i.ip}:{i.port}")
         stub = master_pb2_grpc.MasterStub(channel)
-        print("3")
+        # print("3")
         try:
-            request = master_pb2.PartitionRequest(indexes = split_data, centroids = self.new_centroids)
+            request = master_pb2.PartitionRequest(indexes = split_data, centroids = self.old_centroids, numReducers = self.num_reducers)
             response = stub.PartitionInput(request)
             if response.status == True:
                 print("hogya")
@@ -84,6 +109,22 @@ class Master(master_pb2_grpc.MasterServicer):
         except Exception as e:
             print(e)
 
+    def request_reducer(self, i:Address, centroidID):
+        # print("4")
+        channel = grpc.insecure_channel(f"{i.ip}:{i.port}")
+        stub = reducer_pb2_grpc.ReducerStub(channel)
+        # print("5")
+        try:
+            print(self.mapper_ports)
+            request = reducer_pb2.ShuffleSortRequest(centroidID = centroidID, numMappers = self.num_mappers, mapAddresses = self.mapper_ports)
+            print("hola")
+            response = stub.ShuffleAndSort(request)
+            print(" amigo")
+            self.new_centroids[response.index] = [response.x, response.y]
+            print(f"Testing Response {response.index} {response.x} {response.y}")
+            print(self.new_centroids)
+        except Exception as e:
+            print(e)
 
 
 def serve(master):

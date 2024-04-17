@@ -19,12 +19,23 @@ class MasterStub(object):
                 request_serializer=master__pb2.PartitionRequest.SerializeToString,
                 response_deserializer=master__pb2.MapAndPartitionResponse.FromString,
                 )
+        self.GetPoints = channel.unary_unary(
+                '/Master/GetPoints',
+                request_serializer=master__pb2.GetPointByCentroidRequest.SerializeToString,
+                response_deserializer=master__pb2.GetCentroidResponse.FromString,
+                )
 
 
 class MasterServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def PartitionInput(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetPoints(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -37,6 +48,11 @@ def add_MasterServicer_to_server(servicer, server):
                     servicer.PartitionInput,
                     request_deserializer=master__pb2.PartitionRequest.FromString,
                     response_serializer=master__pb2.MapAndPartitionResponse.SerializeToString,
+            ),
+            'GetPoints': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetPoints,
+                    request_deserializer=master__pb2.GetPointByCentroidRequest.FromString,
+                    response_serializer=master__pb2.GetCentroidResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -62,5 +78,22 @@ class Master(object):
         return grpc.experimental.unary_unary(request, target, '/Master/PartitionInput',
             master__pb2.PartitionRequest.SerializeToString,
             master__pb2.MapAndPartitionResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetPoints(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/Master/GetPoints',
+            master__pb2.GetPointByCentroidRequest.SerializeToString,
+            master__pb2.GetCentroidResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

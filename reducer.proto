@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+message Centroid {
+    int32 index = 1;
+    double x = 2;
+    double y = 3;
+}
+
+message ShuffleSortRequest {
+    int32 centroidID = 1;
+    int32 numMappers = 2;
+    repeated int32 mapAddresses = 3;
+}
+
+message ReducerResponse {
+    Centroid updatedCentroids = 1;
+}
+
+service Reducer {
+    rpc ShuffleAndSort(ShuffleSortRequest) returns (ReducerResponse);
+}

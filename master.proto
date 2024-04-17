@@ -10,12 +10,22 @@ message Point {
 message PartitionRequest {
     repeated int32 indexes = 1;
     repeated Point centroids = 2;
+    int32 numReducers = 3;
 }
 
 message MapAndPartitionResponse {
     bool status = 1;
 }
 
+message GetPointByCentroidRequest {
+    int32 centroidID = 1;
+}
+
+message GetCentroidResponse {
+    repeated Point points = 1; 
+}
+
 service Master {
     rpc PartitionInput(PartitionRequest) returns (MapAndPartitionResponse);
+    rpc GetPoints(GetPointByCentroidRequest) returns (GetCentroidResponse);
 }
