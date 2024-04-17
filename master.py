@@ -152,6 +152,7 @@ class Master(master_pb2_grpc.MasterServicer):
             for hola in self.mapper_addr:
                 print(f"port: {hola.port}", end= " ")
             self.mapper_addr.remove(i)
+            self.mapper_ports.remove(int(i.port))
             print("After")
             for hola in self.mapper_addr:
                 print(f"port: {hola.port}", end= " ")

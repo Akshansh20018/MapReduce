@@ -58,17 +58,17 @@ class Reducer:
                     # print("Hello",points[i].index)
                     self.data_points.append([points[i].index,points[i].x, points[i].y])
             except:
-                print("Reached an except")
-                # pointsList = []
-                # with open(f"./Mapper/M{self.id}/Partition_{centroidID%self.num_reducers}", 'r') as file:
-                #     for line in file:
-                #         cid, x, y, f = line.strip().split(' ')
-                #         print(cid)
-                #         if int(cid)==centroidID:
-                #             pointsList.append({'index':int(cid), 'x':float(x), 'y':float(y)})
-                # for i in range(len(pointsList)):
-                #     # print("Hello",points[i].index)
-                #     self.data_points.append([pointsList[i]['index'],pointsList[i]['x'],pointsList[i]['y']])
+                # print("Reached an except")
+                pointsList = []
+                with open(f"./Mapper/M{self.id}/Partition_{centroidID%self.num_reducers}", 'r') as file:
+                    for line in file:
+                        cid, x, y, f = line.strip().split(' ')
+                        print(cid)
+                        if int(cid)==centroidID:
+                            pointsList.append({'index':int(cid), 'x':float(x), 'y':float(y)})
+                for i in range(len(pointsList)):
+                    # print("Hello",points[i].index)
+                    self.data_points.append([pointsList[i]['index'],pointsList[i]['x'],pointsList[i]['y']])
 
 
 
