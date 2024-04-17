@@ -48,7 +48,7 @@ class Mapper:
             for j in range(len(self.centroids_lst)):
                 # print("idhar bhi aaya")
                 temp_dist = helper_dist(data_points[i], self.centroids_lst[j])
-                if temp_dist<=dist_min:
+                if temp_dist<dist_min:
                     # print("updated a dist")
                     dist_min = temp_dist
                     ind_min = j
@@ -57,7 +57,7 @@ class Mapper:
         # print("akshansh error")
         for i in range(len(self.centroids_lst)):
             print("creating file")
-            with open(f"./Mapper/M{self.id}/Partition_{i%self.num_reducers}", 'w') as file:
+            with open(f"./Mapper/M{self.id}/Partition_{i%self.num_reducers}", 'a') as file:
                 # print("File Test")
                 for j in self.red_dict[i]:
                     file.write(f"{i} {j[0][0]} {j[0][1]} {j[1]} \n")
@@ -69,6 +69,11 @@ class MasterHandler(master_pb2_grpc.MasterServicer, Mapper):
         # self.serve()
 
     def PartitionInput(self, request, context):
+        for i in range(len(self.centroids_lst)):
+            print("Emptying file")
+            with open(f"./Mapper/M{self.id}/Partition_{i%self.num_reducers}", 'w') as file:
+                pass
+        
         print("Reached here")
         indexes = request.indexes
         centroids = request.centroids
@@ -98,7 +103,8 @@ class MasterHandler(master_pb2_grpc.MasterServicer, Mapper):
             for line in file:
                     cid, x, y, f = line.strip().split(' ')
                     print(cid)
-                    pointsList.append({'index':int(cid), 'x':float(x), 'y':float(y)})
+                    if int(cid)==centroidID:
+                        pointsList.append({'index':int(cid), 'x':float(x), 'y':float(y)})
         return master_pb2.GetCentroidResponse(points = pointsList)
 
 def run(handler: MasterHandler):

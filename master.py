@@ -51,7 +51,7 @@ class Master(master_pb2_grpc.MasterServicer):
         for i in range(self.num_iterations):
             print(i)
             self.split_data()
-            print("uasuobao: ", self.old_centroids, self.new_centroids)
+            print("uasuobao: ", self.new_centroids)
             if self.old_centroids == self.new_centroids:
                 print(f"Converged at iteration {i}")
                 break
