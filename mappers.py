@@ -94,7 +94,7 @@ class MasterHandler(master_pb2_grpc.MasterServicer, Mapper):
     def GetPoints(self, request, context):
         centroidID = request.centroidID
         pointsList = []
-        with open(f"./Mapper/M{self.id}/Partition_{centroidID}", 'r') as file:
+        with open(f"./Mapper/M{self.id}/Partition_{centroidID%self.num_reducers}", 'r') as file:
             for line in file:
                     cid, x, y, f = line.strip().split(' ')
                     print(cid)
