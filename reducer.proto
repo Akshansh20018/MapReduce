@@ -16,11 +16,13 @@ message ShuffleSortRequest {
     int32 centroidID = 1;
     int32 numMappers = 2;
     repeated int32 mapAddresses = 3;
+    int32 numReducers = 4;
 }
 
 message ReducerResponse {
     int32 centroidID = 1;
     Cent updatedCentroids = 2;
+    bool status = 3;
 }
 
 service Reducer {

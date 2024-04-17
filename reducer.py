@@ -10,6 +10,7 @@ import sys
 from addr import *
 import os 
 import math
+import time
 
 def helper_new_centroid(data_points):
     x_sum = 0
@@ -29,6 +30,7 @@ class Reducer:
         self.address = address
         self.id = id 
         self.data_points = []
+        self.num_reducers = 0
 
     def reduce_data(self, grouped_data):
         new_centroids = self.calculate_new_centroids(grouped_data)
@@ -45,15 +47,27 @@ class Reducer:
     def receive_data(self, mapper_addresses, num_mappers, centroidID):
         for i in range(num_mappers):
             # print("huuuu", i)
-            channel = grpc.insecure_channel(f"[::]:{mapper_addresses[i]}")
-            stub = master_pb2_grpc.MasterStub(channel)
-            request = master_pb2.GetPointByCentroidRequest(centroidID = centroidID)
-            response = stub.GetPoints(request)
-            points = response.points
+            try:
+                channel = grpc.insecure_channel(f"[::]:{mapper_addresses[i]}")
+                stub = master_pb2_grpc.MasterStub(channel)
+                request = master_pb2.GetPointByCentroidRequest(centroidID = centroidID)
+                response = stub.GetPoints(request)
+                points = response.points
 
-            for i in range(len(points)):
-                # print("Hello",points[i].index)
-                self.data_points.append([points[i].index,points[i].x, points[i].y])
+                for i in range(len(points)):
+                    # print("Hello",points[i].index)
+                    self.data_points.append([points[i].index,points[i].x, points[i].y])
+            except:
+                pointsList = []
+                with open(f"./Mapper/M{self.id}/Partition_{centroidID%self.num_reducers}", 'r') as file:
+                    for line in file:
+                        cid, x, y, f = line.strip().split(' ')
+                        print(cid)
+                        if int(cid)==centroidID:
+                            pointsList.append({'index':int(cid), 'x':float(x), 'y':float(y)})
+                for i in range(len(pointsList)):
+                    # print("Hello",points[i].index)
+                    self.data_points.append([pointsList[i]['index'],pointsList[i]['x'],pointsList[i]['y']])
 
 
 
@@ -62,12 +76,15 @@ class ReducerHandler(reducer_pb2_grpc.ReducerServicer, Reducer):
         super().__init__(id, address)
 
     def ShuffleAndSort(self, request, context):
+        print("Kill BILL")
+        time.sleep(3)
         try:
             self.data_points = []
             # print("Success")
             num_mappers = request.numMappers
             centroidID = request.centroidID
             mapper_addresses = request.mapAddresses
+            self.num_reducers = request.numReducers
             # Recieve all data here
             print(mapper_addresses)
             self.receive_data(mapper_addresses, num_mappers, centroidID)
@@ -80,7 +97,7 @@ class ReducerHandler(reducer_pb2_grpc.ReducerServicer, Reducer):
             # else:
             updated_centroid = Cent(x=upd_centroid[1], y=upd_centroid[2])
             print(f"updated centroid: {upd_centroid[0]} - {updated_centroid}")
-            return reducer_pb2.ReducerResponse(centroidID = upd_centroid[0],updatedCentroids = updated_centroid)
+            return reducer_pb2.ReducerResponse(centroidID = upd_centroid[0],updatedCentroids = updated_centroid,status =True)
         # pass
         except Exception as e:
         # Log the exception

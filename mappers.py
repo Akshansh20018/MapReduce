@@ -6,6 +6,7 @@ import sys
 from addr import *
 import os 
 import math
+import time
 
 def helper_dist(point, centroid):
     # print(f"point {point}")
@@ -69,6 +70,7 @@ class MasterHandler(master_pb2_grpc.MasterServicer, Mapper):
         # self.serve()
 
     def PartitionInput(self, request, context):
+        time.sleep(2)
         for i in range(len(self.centroids_lst)):
             print("Emptying file")
             with open(f"./Mapper/M{self.id}/Partition_{i%self.num_reducers}", 'w') as file:

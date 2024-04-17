@@ -97,6 +97,10 @@ class Master(master_pb2_grpc.MasterServicer):
         # print("BOOOOOOOO")
         request = []
         for i in range(self.num_centroids):
+            if(i>0 and (i%self.num_reducers==0)):
+                for j in request:
+                    j.join()
+                request = []
             thread = threading.Thread(target=self.request_reducer, args=(self.reducer_addr[i%self.num_reducers],i))    
             request.append(thread)
             thread.start()
@@ -112,37 +116,50 @@ class Master(master_pb2_grpc.MasterServicer):
         channel = grpc.insecure_channel(f"{i.ip}:{i.port}")
         stub = master_pb2_grpc.MasterStub(channel)
         # print("3")
-        try:
-            request = master_pb2.PartitionRequest(indexes = split_data, centroids = self.new_centroids, numReducers = self.num_reducers)
-            response = stub.PartitionInput(request)
-            if response.status == True:
-                print("hogya")
-            else:
-                print("nhk")
-        except Exception as e:
-            print("error in mapper")
+        while(True):
+            try:
+                request = master_pb2.PartitionRequest(indexes = split_data, centroids = self.new_centroids, numReducers = self.num_reducers)
+                response = stub.PartitionInput(request)
+                if response.status == True:
+                    print("hogya")
+                    break
+                else:
+                    print("Tring again")
+                    time.sleep(1)
+            except Exception as e:
+                time.sleep(1)
+                print("error in mapper trying again")
+                # self.request_mapper_partition(i,split_data)
 
     def request_reducer(self, i:Address, centroidID):
-        # print("4")
         channel = grpc.insecure_channel(f"{i.ip}:{i.port}")
         stub = reducer_pb2_grpc.ReducerStub(channel)
-        # print("5")
-        try:
-            print(self.mapper_ports)
-            request = reducer_pb2.ShuffleSortRequest(centroidID = centroidID, numMappers = self.num_mappers, mapAddresses = self.mapper_ports)
-            print("hola")
-            response = stub.ShuffleAndSort(request)
-            print(" amigo")
-            print(response)
-            id = response.centroidID
-            x, y = response.updatedCentroids.x, response.updatedCentroids.y
-            # print("Here here", id, x, y)
-            self.new_centroids[id] = Point(index = id,x = x,y = y)
-            # self.new_centroids[response.index] = [response.x, response.y]
-            # print(f"Testing Response {response.index} {response.x} {response.y}")
-            print(self.new_centroids)
-        except Exception as e:
-            print("error in reducer", centroidID)
+        while(True):
+            try:
+                print(self.mapper_ports)
+                request = reducer_pb2.ShuffleSortRequest(centroidID = centroidID, numMappers = self.num_mappers, mapAddresses = self.mapper_ports,numReducers = self.num_reducers)
+                print("hola")
+                response = stub.ShuffleAndSort(request)
+                if(response.status):
+                    print(" amigo")
+                    print(response)
+                    id = response.centroidID
+                    x, y = response.updatedCentroids.x, response.updatedCentroids.y
+                    self.new_centroids[id] = Point(index = id,x = x,y = y)
+                    # print("Here here", id, x, y)
+                    # self.new_centroids[response.index] = [response.x, response.y]
+                    # print(f"Testing Response {response.index} {response.x} {response.y}")
+                    print(self.new_centroids)
+                    break
+                else:
+                    print("Status response false")
+                    time.sleep(1)
+
+            except Exception as e:
+                time.sleep(1)
+                print("error in contacting reducer")
+            # self.request_reducer(i,centroidID)
+
 
 
 def serve(master):
