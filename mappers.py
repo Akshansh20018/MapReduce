@@ -9,8 +9,6 @@ import math
 import time
 
 def helper_dist(point, centroid):
-    # print(f"point {point}")
-    # print(f"centroid {centroid}")
     dist = ((point[0]-centroid[0])**2)+((point[1]-centroid[1])**2)
     return math.sqrt(dist)
 
@@ -26,40 +24,33 @@ class Mapper:
         try: 
             os.mkdir(f"./Mapper/M{self.id}")
         except:
-            print("error in mkdir")
+            # print("error in mkdir")
+            pass
     
     def process_data(self):
-        # For the example, assume data is already loaded in memory or accessible
         data_points = []
-        print("Test 1")
+        # print("Test 1")
         with open(self.file_path, 'r') as file:
             count = 0
             for line in file:
-                # print(line)
                 if count in self.ind_lst:
                     x, y = line.strip().split(', ')
                     data_points.append([float(x), float(y)])
                 count+= 1
-        # print(self.red_dict)
 
         for i in range(len(data_points)):
             dist_min = 1e9
             ind_min = -1
-            # print(f"len {len(data_points)}")
             for j in range(len(self.centroids_lst)):
-                # print("idhar bhi aaya")
                 temp_dist = helper_dist(data_points[i], self.centroids_lst[j])
                 if temp_dist<dist_min:
-                    # print("updated a dist")
                     dist_min = temp_dist
                     ind_min = j
             self.red_dict[ind_min].append([data_points[i], 1])
         
-        # print("akshansh error")
         for i in range(len(self.centroids_lst)):
-            print("creating file")
+            # print("creating file")
             with open(f"./Mapper/M{self.id}/Partition_{i%self.num_reducers}", 'a') as file:
-                # print("File Test")
                 for j in self.red_dict[i]:
                     file.write(f"{i} {j[0][0]} {j[0][1]} {j[1]} \n")
 
@@ -67,28 +58,25 @@ class Mapper:
 class MasterHandler(master_pb2_grpc.MasterServicer, Mapper):
     def __init__(self, id:int, address: Address):
         super().__init__(id, address)
-        # self.serve()
 
     def PartitionInput(self, request, context):
+        print(f"Partition Input Called by Master on Mapper: {self.address.port}")
         time.sleep(2)
         for i in range(len(self.centroids_lst)):
-            print("Emptying file")
             with open(f"./Mapper/M{self.id}/Partition_{i%self.num_reducers}", 'w') as file:
                 pass
         
-        print("Reached here")
         indexes = request.indexes
         centroids = request.centroids
         self.num_reducers = request.numReducers
 
         self.ind_lst = []
         self.centroids_lst = []
-        print(centroids)
+        # print(centroids)
         for i in range(len(indexes)):
             self.ind_lst.append(indexes[i])
 
         for i in range(len(centroids)):
-            # print(centroids[i].x,centroids[i].y)
             self.centroids_lst.append([centroids[i].x,centroids[i].y])
 
         for i in range(len(self.centroids_lst)):
@@ -99,12 +87,13 @@ class MasterHandler(master_pb2_grpc.MasterServicer, Mapper):
         return master_pb2.MapAndPartitionResponse(status=True)
     
     def GetPoints(self, request, context):
+        print(f"Reducer request for getting points on mapper at {self.address.port}")
         centroidID = request.centroidID
         pointsList = []
         with open(f"./Mapper/M{self.id}/Partition_{centroidID%self.num_reducers}", 'r') as file:
             for line in file:
                     cid, x, y, f = line.strip().split(' ')
-                    print(cid)
+                    # print(cid)
                     if int(cid)==centroidID:
                         pointsList.append({'index':int(cid), 'x':float(x), 'y':float(y)})
         return master_pb2.GetCentroidResponse(points = pointsList)

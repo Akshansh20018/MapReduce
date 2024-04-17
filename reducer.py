@@ -45,29 +45,27 @@ class Reducer:
         return new_centroids
 
     def receive_data(self, mapper_addresses, num_mappers, centroidID):
-        for i in range(num_mappers):
-            # print("huuuu", i)
+        for j in range(num_mappers):
             try:
-                channel = grpc.insecure_channel(f"[::]:{mapper_addresses[i]}")
+                channel = grpc.insecure_channel(f"[::]:{mapper_addresses[j]}")
                 stub = master_pb2_grpc.MasterStub(channel)
                 request = master_pb2.GetPointByCentroidRequest(centroidID = centroidID)
                 response = stub.GetPoints(request)
                 points = response.points
+                print(f"Reducer received point from mapper: {mapper_addresses[j]}")
 
                 for i in range(len(points)):
-                    # print("Hello",points[i].index)
                     self.data_points.append([points[i].index,points[i].x, points[i].y])
+                # print(f"Len of data point: {len(self.data_points)}")
             except:
-                # print("Reached an except")
                 pointsList = []
                 with open(f"./Mapper/M{self.id}/Partition_{centroidID%self.num_reducers}", 'r') as file:
                     for line in file:
                         cid, x, y, f = line.strip().split(' ')
-                        print(cid)
+                        # print(cid)
                         if int(cid)==centroidID:
                             pointsList.append({'index':int(cid), 'x':float(x), 'y':float(y)})
                 for i in range(len(pointsList)):
-                    # print("Hello",points[i].index)
                     self.data_points.append([pointsList[i]['index'],pointsList[i]['x'],pointsList[i]['y']])
 
 
@@ -77,41 +75,28 @@ class ReducerHandler(reducer_pb2_grpc.ReducerServicer, Reducer):
         super().__init__(id, address)
 
     def ShuffleAndSort(self, request, context):
-        print("Kill BILL")
+        print("Called Shuffle and Sort from Master to Reducer")
         time.sleep(3)
         try:
             self.data_points = []
-            # print("Success")
             num_mappers = request.numMappers
             centroidID = request.centroidID
             mapper_addresses = request.mapAddresses
             self.num_reducers = request.numReducers
-            # Recieve all data here
-            print(mapper_addresses)
+            # print(mapper_addresses)
             self.receive_data(mapper_addresses, num_mappers, centroidID)
             
             upd_centroid = helper_new_centroid(self.data_points)
-            print(centroidID)
-            # response = {'index': centroidID, 'x': upd_centroid[0], 'y': upd_centroid[1]}
-            # if centroidID == 0:
-            #     updated_centroid = Centroid(index=request.centroidID, x=upd_centroid[0], y=upd_centroid[1])
-            # else:
+            # print(centroidID)
             updated_centroid = Cent(x=upd_centroid[1], y=upd_centroid[2])
-            print(f"updated centroid: {upd_centroid[0]} - {updated_centroid}")
+            # print(f"updated centroid: {upd_centroid[0]} - {updated_centroid}")
+            with open(f"./Reducer/R{self.id}", 'a') as file:
+                file.write(f"{upd_centroid[0]} {upd_centroid[1]} {upd_centroid[2]} \n")
+
             return reducer_pb2.ReducerResponse(centroidID = upd_centroid[0],updatedCentroids = updated_centroid,status =True)
-        # pass
+
         except Exception as e:
-        # Log the exception
-            print(f"An error occurred: {e}")
-            
-            # Set gRPC status details
-            context.set_details(str(e))
-            
-            # Set gRPC status code
-            context.set_code(grpc.StatusCode.INTERNAL)
-            
-            # Raise the exception to terminate the RPC
-            raise
+            print(f"An error occurred: {e}")            
 
 
 def run(handler: ReducerHandler):

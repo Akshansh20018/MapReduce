@@ -34,31 +34,42 @@ class Master(master_pb2_grpc.MasterServicer):
         self.old_centroids = []
         self.new_centroids = []
         self.mapper_ports = []
-        # for i in range(self.num_centroids):
-        #     x = random.uniform(30,40)
-        #     y = random.uniform(30,40)
-        #     self.new_centroids.append(Point(index = i, x = x, y = y))
+
+        self.line_count = 0
+        with open(self.file_path, 'r') as file:
+            for line in file:
+                self.line_count+= 1
+
+        self.rand_selection = random.sample(range(self.line_count), self.num_centroids)
+        # print(f"random selection: {self.rand_selection}")
+
         with open(self.file_path, 'r') as file:
             count = 0
+            temp_line_count = 0
             for line in file:
                 if count == self.num_centroids:
                     break
-                idx = count
-                x, y = line.strip().split(', ')
-                point = Point(index=idx, x=float(x), y=float(y))
-                self.new_centroids.append(point)
-                count+= 1
-        print(self.mapper_addr[0].port)
+                if temp_line_count in self.rand_selection:
+                    idx = count
+                    x, y = line.strip().split(', ')
+                    point = Point(index=idx, x=float(x), y=float(y))
+                    self.new_centroids.append(point)
+                    count+= 1
+                temp_line_count+= 1
+
+        print(f"Initialized centroids: {self.new_centroids}")
         for i in range(self.num_mappers):
             self.mapper_ports.append(int(self.mapper_addr[i].port))
 
         for i in range(self.num_iterations):
-            # print(i)
             self.split_data()
             self.iter+=1
+            with open(f"./centroids.txt", 'w') as file:
+                for i in range (len(self.new_centroids)):
+                    file.write(f"{i} {self.new_centroids[i].x} {self.new_centroids[i].y} \n")
             if(self.converged):
                 return
-            print("uasuobao: ", self.new_centroids)
+            # print("new centroids: ", self.new_centroids)
            
         
 
@@ -70,7 +81,6 @@ class Master(master_pb2_grpc.MasterServicer):
         points = []
         with open(self.file_path, 'r') as file:
             for line in file:
-                # print(line)
                 x, y = line.strip().split(', ')
                 points.append([float(x), float(y)])
         
@@ -81,36 +91,23 @@ class Master(master_pb2_grpc.MasterServicer):
         for i in range(data_len):
             ind = i%self.num_mappers
             split_data[ind].append(i)
-        # print(split_data)
 
         request = []
-        # for i in range(len(self.mapper_addr)):
-        # m = multiprocessing.Pool(self.num_mappers)
-        # r = multiprocessing.Pool(self.num_centroids)
         for i in range(self.num_mappers):
-            # print("1")
             thread = threading.Thread(target=self.request_mapper_partition, args=(self.mapper_addr[i], split_data[i]))    
             request.append(thread)
             thread.start()
-        #     m.apply_async(self.request_mapper_partition, args = ((self.mapper_addr[i], split_data[i])))
-        # # time.sleep(2)
-        # m.close()
-        # m.join()
         for i in request:
             i.join()
         if(self.map_rerun):
             self.map_rerun = False
             self.split_data()
             return
-        if self.old_centroids == self.new_centroids:
-            print(f"Converged at iteration {self.iter}")
-            self.converged = True
-            return
-        self.old_centroids = copy.deepcopy(self.new_centroids)
-        # print("BOOOOOOOO")
         request = []
         for i in range(self.num_centroids):
+            # print(f"self.num_reducers {self.num_reducers}")
             if(i>0 and (i%self.num_reducers==0)):
+                # print(i)
                 for j in request:
                     j.join()
                 if(self.reducer_rerun):
@@ -121,77 +118,60 @@ class Master(master_pb2_grpc.MasterServicer):
             thread = threading.Thread(target=self.request_reducer, args=(self.reducer_addr[i%self.num_reducers],i))    
             request.append(thread)
             thread.start()
-        #     r.apply_async(self.request_reducer, args=(self.reducer_addr[i%self.num_reducers],i))
-        # r.close()
-        # r.join()
+
         for i in request:
             i.join()
         if(self.reducer_rerun):
             self.reducer_rerun = False
             self.split_data()
             return
-        
-        # print("BO2")
+
+        print(f"Iteration: {self.iter}")
+        print(f"Centroids: {self.new_centroids}")
+
+        if self.old_centroids == self.new_centroids:
+            print(f"Converged at iteration {self.iter}")
+            self.converged = True
+            return
+        self.old_centroids = copy.deepcopy(self.new_centroids)
     
     def request_mapper_partition(self, i:Address, split_data):
-        # print("2")
         channel = grpc.insecure_channel(f"{i.ip}:{i.port}")
         stub = master_pb2_grpc.MasterStub(channel)
-        # print("3")
         try:
             request = master_pb2.PartitionRequest(indexes = split_data, centroids = self.new_centroids, numReducers = self.num_reducers)
             response = stub.PartitionInput(request)
-            if response.status == True:
-                print("hogya")
-            else:
-                print("Tring again")
-                time.sleep(1)
+            print(f"Response received from mapper: {i.port} partition")
         except Exception as e:
-            time.sleep(0.2)
-            print("Before")
-            for hola in self.mapper_addr:
-                print(f"port: {hola.port}", end= " ")
+            # time.sleep(0.2)
             self.mapper_addr.remove(i)
             self.mapper_ports.remove(int(i.port))
-            print("After")
-            for hola in self.mapper_addr:
-                print(f"port: {hola.port}", end= " ")
             self.num_mappers-=1
             self.map_rerun = True
-            print("error in mapper trying again")
-            # self.request_mapper_partition(i,split_data)
+            print("Mapper partition response failed")
 
     def request_reducer(self, i:Address, centroidID):
         channel = grpc.insecure_channel(f"{i.ip}:{i.port}")
         stub = reducer_pb2_grpc.ReducerStub(channel)
         try:
-            print(self.mapper_ports)
             request = reducer_pb2.ShuffleSortRequest(centroidID = centroidID, numMappers = self.num_mappers, mapAddresses = self.mapper_ports,numReducers = self.num_reducers)
-            print("hola")
             response = stub.ShuffleAndSort(request)
             if(response.status):
-                print(" amigo")
-                print(response)
+                print(f"Response received from reducer: {i.port}")
                 id = response.centroidID
                 x, y = response.updatedCentroids.x, response.updatedCentroids.y
                 self.new_centroids[id] = Point(index = id,x = x,y = y)
 
-                # print("Here here", id, x, y)
-                # self.new_centroids[response.index] = [response.x, response.y]
-                # print(f"Testing Response {response.index} {response.x} {response.y}")
-                print(self.new_centroids)
+                # print(self.new_centroids)
             else:
-                print("Status response false")
-                time.sleep(1)
+                print("Reducer shuffle sort response failed")
 
         except Exception as e:
-            time.sleep(0.5)
+            # time.sleep(0.5)
             self.reducer_addr.remove(i)
             self.num_reducers -=1
             self.reducer_rerun = True
-            print("error in contacting reducer")
-            # self.request_reducer(i,centroidID)
-
+            print("Reducer shuffle sort response failed")
 
 
 def serve(master):
