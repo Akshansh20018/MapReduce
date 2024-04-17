@@ -16,10 +16,14 @@ class Address:
     def __init__(self, id: int, ip: str, port: int):
         self.id = id
         self.ip = ip
-        self.port = port
+        self.port = port # Akshansh is sad
 
 class Master(master_pb2_grpc.MasterServicer):
     def __init__(self, num_mappers, num_reducers, num_centroids, num_iterations, file_path, mapper_addresses, reducer_addresses):
+        self.converged = False
+        self.iter = 1
+        self.map_rerun = False
+        self.reducer_rerun = False
         self.num_mappers = num_mappers
         self.num_reducers = num_reducers
         self.num_centroids = num_centroids
@@ -49,13 +53,13 @@ class Master(master_pb2_grpc.MasterServicer):
             self.mapper_ports.append(int(self.mapper_addr[i].port))
 
         for i in range(self.num_iterations):
-            print(i)
+            # print(i)
             self.split_data()
+            self.iter+=1
+            if(self.converged):
+                return
             print("uasuobao: ", self.new_centroids)
-            if self.old_centroids == self.new_centroids:
-                print(f"Converged at iteration {i}")
-                break
-            self.old_centroids = copy.deepcopy(self.new_centroids)
+           
         
 
     def ProcessTask(self, request, context):
@@ -94,12 +98,25 @@ class Master(master_pb2_grpc.MasterServicer):
         # m.join()
         for i in request:
             i.join()
+        if(self.map_rerun):
+            self.map_rerun = False
+            self.split_data()
+            return
+        if self.old_centroids == self.new_centroids:
+            print(f"Converged at iteration {self.iter}")
+            self.converged = True
+            return
+        self.old_centroids = copy.deepcopy(self.new_centroids)
         # print("BOOOOOOOO")
         request = []
         for i in range(self.num_centroids):
             if(i>0 and (i%self.num_reducers==0)):
                 for j in request:
                     j.join()
+                if(self.reducer_rerun):
+                    self.reducer_rerun = False
+                    self.split_data()
+                    return
                 request = []
             thread = threading.Thread(target=self.request_reducer, args=(self.reducer_addr[i%self.num_reducers],i))    
             request.append(thread)
@@ -109,6 +126,11 @@ class Master(master_pb2_grpc.MasterServicer):
         # r.join()
         for i in request:
             i.join()
+        if(self.reducer_rerun):
+            self.reducer_rerun = False
+            self.split_data()
+            return
+        
         # print("BO2")
     
     def request_mapper_partition(self, i:Address, split_data):
@@ -116,48 +138,57 @@ class Master(master_pb2_grpc.MasterServicer):
         channel = grpc.insecure_channel(f"{i.ip}:{i.port}")
         stub = master_pb2_grpc.MasterStub(channel)
         # print("3")
-        while(True):
-            try:
-                request = master_pb2.PartitionRequest(indexes = split_data, centroids = self.new_centroids, numReducers = self.num_reducers)
-                response = stub.PartitionInput(request)
-                if response.status == True:
-                    print("hogya")
-                    break
-                else:
-                    print("Tring again")
-                    time.sleep(1)
-            except Exception as e:
+        try:
+            request = master_pb2.PartitionRequest(indexes = split_data, centroids = self.new_centroids, numReducers = self.num_reducers)
+            response = stub.PartitionInput(request)
+            if response.status == True:
+                print("hogya")
+            else:
+                print("Tring again")
                 time.sleep(1)
-                print("error in mapper trying again")
-                # self.request_mapper_partition(i,split_data)
+        except Exception as e:
+            time.sleep(0.2)
+            print("Before")
+            for hola in self.mapper_addr:
+                print(f"port: {hola.port}", end= " ")
+            self.mapper_addr.remove(i)
+            print("After")
+            for hola in self.mapper_addr:
+                print(f"port: {hola.port}", end= " ")
+            self.num_mappers-=1
+            self.map_rerun = True
+            print("error in mapper trying again")
+            # self.request_mapper_partition(i,split_data)
 
     def request_reducer(self, i:Address, centroidID):
         channel = grpc.insecure_channel(f"{i.ip}:{i.port}")
         stub = reducer_pb2_grpc.ReducerStub(channel)
-        while(True):
-            try:
-                print(self.mapper_ports)
-                request = reducer_pb2.ShuffleSortRequest(centroidID = centroidID, numMappers = self.num_mappers, mapAddresses = self.mapper_ports,numReducers = self.num_reducers)
-                print("hola")
-                response = stub.ShuffleAndSort(request)
-                if(response.status):
-                    print(" amigo")
-                    print(response)
-                    id = response.centroidID
-                    x, y = response.updatedCentroids.x, response.updatedCentroids.y
-                    self.new_centroids[id] = Point(index = id,x = x,y = y)
-                    # print("Here here", id, x, y)
-                    # self.new_centroids[response.index] = [response.x, response.y]
-                    # print(f"Testing Response {response.index} {response.x} {response.y}")
-                    print(self.new_centroids)
-                    break
-                else:
-                    print("Status response false")
-                    time.sleep(1)
+        try:
+            print(self.mapper_ports)
+            request = reducer_pb2.ShuffleSortRequest(centroidID = centroidID, numMappers = self.num_mappers, mapAddresses = self.mapper_ports,numReducers = self.num_reducers)
+            print("hola")
+            response = stub.ShuffleAndSort(request)
+            if(response.status):
+                print(" amigo")
+                print(response)
+                id = response.centroidID
+                x, y = response.updatedCentroids.x, response.updatedCentroids.y
+                self.new_centroids[id] = Point(index = id,x = x,y = y)
 
-            except Exception as e:
+                # print("Here here", id, x, y)
+                # self.new_centroids[response.index] = [response.x, response.y]
+                # print(f"Testing Response {response.index} {response.x} {response.y}")
+                print(self.new_centroids)
+            else:
+                print("Status response false")
                 time.sleep(1)
-                print("error in contacting reducer")
+
+        except Exception as e:
+            time.sleep(0.5)
+            self.reducer_addr.remove(i)
+            self.num_reducers -=1
+            self.reducer_rerun = True
+            print("error in contacting reducer")
             # self.request_reducer(i,centroidID)
 
 
